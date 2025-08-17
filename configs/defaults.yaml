@@ -1,0 +1,55 @@
+app:
+  name: ApexTracer-Lite
+  version: 0.1.0
+  backend_url: http://localhost:8000
+
+video:
+  min_resolution: [1280, 720]
+  max_fps: 240
+
+ detection:
+  backend: auto  # "onnx" or "heuristic" or "auto"
+  min_conf: 0.1
+  max_candidates: 10
+  tile_long_side: 1280
+  min_radius_px: 1
+  max_radius_px: 30
+
+ tracking:
+  iou_threshold: 0.1
+  max_gap_ms: 200
+  process_noise: 5.0
+  measurement_noise: 2.0
+
+ launch:
+  speed_jump_thresh: 2.0  # px/ms
+  min_track_len: 10
+
+ calib:
+  fov_deg_guess: 75.0
+  principal_point: auto
+  horizon_frac_default: 0.4
+
+ scale:
+  use_ball_diameter: true
+  ball_diameter_m: 0.04267
+  speed_prior_mps: [30.0, 90.0]
+
+ physics:
+  g: 9.80665
+  use_drag: false
+  cd_prior_mean: 1.0
+  cd_prior_std: 0.5
+
+ render:
+  color_tracer: [255, 80, 20]
+  color_halo: [255, 200, 180]
+  halo_alpha: 0.25
+  hud_text_color: [255, 255, 255]
+  hud_shadow_color: [0, 0, 0]
+  font_scale: 0.7
+  thickness: 2
+
+ export:
+  codec: h264
+  ffmpeg_path: ffmpeg
