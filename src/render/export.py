@@ -4,70 +4,114 @@ import shutil
 import subprocess
 import cv2
 import numpy as np
+import os
 
 from .overlay import draw_tracer
 
 
-def write_overlay_video(input_video: str, output_video: str, points_px: List[Tuple[float, float]], codec: str = "h264", ffmpeg_path: str = "ffmpeg"):
-    # Open input video
+def write_overlay_video(
+    input_video: str,
+    output_path: str,
+    tracker,
+    codec: str = "mp4v",
+    ffmpeg_path: str = "ffmpeg",
+) -> None:
+    """Write video with trajectory overlay using polynomial-fitted trajectory.
+
+    Args:
+        input_video: Path to input video
+        output_path: Path to save output video
+        tracker: SingleBallTracker instance with trajectory data
+        codec: Video codec to use (default: mp4v)
+        ffmpeg_path: Path to ffmpeg executable
+    """
+    # Get the smooth polynomial trajectory
+    smooth_trajectory = tracker.get_smooth_trajectory(degree=3)
+    raw_points = [(p.cx, p.cy) for p in tracker.get_track()]
+    
     cap = cv2.VideoCapture(input_video)
     if not cap.isOpened():
-        raise RuntimeError("Failed to open input video")
-        
-    # Get video properties
-    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    aspect_ratio = w / h
-    
-    # Set up temporary output
-    tmp_out = str(Path(output_video).with_suffix(".tmp.mp4"))
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')  # Use XVID for intermediate (better quality than mp4v)
-    
-    # Create writer with original dimensions to maintain aspect ratio
-    writer = cv2.VideoWriter(tmp_out, fourcc, fps, (w, h), isColor=True)
+        raise RuntimeError(f"Could not open video: {input_video}")
 
-    idx = 0
-    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or len(points_px)
-    pts_for_frame = []
-    while True:
+    # Get video properties
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    # Create video writer
+    fourcc = cv2.VideoWriter_fourcc(*codec)
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+    frame_idx = 0
+    point_idx = 0
+    points_so_far: List[Tuple[float, float]] = []
+    
+    # Calculate how many points to show in the tracer (for progressive drawing)
+    max_points = len(smooth_trajectory) if smooth_trajectory is not None else len(raw_points)
+    points_per_frame = max(1, max_points // total_frames)
+
+    while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
-        # Use prefix of points up to current index for nice trail
-        if idx < len(points_px):
-            pts_for_frame.append(points_px[idx])
-        frame = draw_tracer(frame, pts_for_frame)
-        writer.write(frame)
-        idx += 1
-    writer.release()
-    cap.release()
 
-    # Try to remux audio and encode with proper settings
-    out = Path(output_video)
-    if shutil.which(ffmpeg_path) and codec.lower() in ("h264", "libx264"):
+        # Add points up to current frame (progressive drawing)
+        target_points = min(max_points, (frame_idx + 1) * points_per_frame)
+        while point_idx < len(raw_points) and point_idx <= target_points:
+            points_so_far = raw_points[:point_idx + 1]
+            point_idx += 1
+
+        # Draw trajectory
+        if points_so_far:
+            # Get the corresponding portion of the smooth trajectory
+            smooth_pts = None
+            if smooth_trajectory is not None:
+                smooth_pts = smooth_trajectory[:min(len(smooth_trajectory), target_points)]
+            
+            frame = draw_tracer(
+                frame, 
+                points_so_far,
+                smooth_points=smooth_pts,
+                color=(0, 0, 255),  # Red
+                thickness=3
+            )
+
+        # Write frame
+        out.write(frame)
+        frame_idx += 1
+
+    # Release resources
+    cap.release()
+    out.release()
+
+    # Check if ffmpeg is available
+    try:
+        # Try to find ffmpeg in the system PATH
+        ffmpeg_cmd = shutil.which(ffmpeg_path) or ffmpeg_path
+        
+        # Remux with ffmpeg for better compatibility
+        temp_path = f"{output_path}.temp.mp4"
+        os.rename(output_path, temp_path)
+        
+        cmd = [
+            ffmpeg_cmd,
+            "-i", temp_path,
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-crf", "23",
+            "-pix_fmt", "yuv420p",
+            "-y",  # Overwrite output file if it exists
+            output_path
+        ]
+        
         try:
-            cmd = [
-                ffmpeg_path,
-                "-y",
-                "-i", tmp_out,
-                "-i", input_video,
-                "-map", "0:v",
-                "-map", "1:a?",
-                "-c:v", "libx264",
-                "-preset", "medium",
-                "-crf", "18",  # Lower CRF = better quality (18-28 is good)
-                "-pix_fmt", "yuv420p",
-                "-movflags", "+faststart",  # For web streaming
-                "-vf", f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2",
-                "-preset", "veryfast",
-                "-crf", "20",
-                "-c:a", "aac",
-                str(out)
-            ]
-            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            Path(tmp_out).unlink(missing_ok=True)
-        except Exception:
-            shutil.move(tmp_out, str(out))
-    else:
-        shutil.move(tmp_out, str(out))
+            subprocess.run(cmd, check=True, capture_output=True)
+            os.remove(temp_path)
+        except (subprocess.CalledProcessError, OSError) as e:
+            # If ffmpeg fails, keep the original file
+            if os.path.exists(temp_path):
+                os.rename(temp_path, output_path)
+            print(f"Warning: FFmpeg remuxing failed, using direct output: {e}")
+    except Exception as e:
+        print(f"Warning: FFmpeg not found, using direct output: {e}")

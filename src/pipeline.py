@@ -98,8 +98,19 @@ def process_video(
     points = points[launch_idx:]
     times_ms = [t - times_ms[launch_idx] for t in times_ms[launch_idx:]]
 
+    # Fit polynomial to the trajectory
+    tracker.fit_polynomial_trajectory(degree=3)
+    
+    # Write output video with overlay
     progress_cb(0.8, "render")
-    out_video = str(out_dir / "tracer.mp4")
-    write_overlay_video(input_video, out_video, points, codec=cfg.get("export", {}).get("codec", "h264"), ffmpeg_path=cfg.get("export", {}).get("ffmpeg_path", "ffmpeg"))
-
+    out_video = str(Path(output_dir) / "tracer.mp4")
+    write_overlay_video(
+        input_video=input_video,
+        output_path=out_video,
+        tracker=tracker,
+        codec=cfg.get("export", {}).get("codec", "mp4v"),
+        ffmpeg_path=cfg.get("export", {}).get("ffmpeg_path", "ffmpeg")
+    )
+    
     progress_cb(1.0, "done")
+    return out_video

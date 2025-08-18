@@ -54,37 +54,72 @@ class BallDetector:
         return self._detect_heuristic(frame_bgr, t_ms)
 
     def _preprocess(self, frame: np.ndarray) -> np.ndarray:
-        """Preprocess frame to enhance ball visibility."""
-        # Convert to HSV color space
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        """Preprocess frame to enhance motion and ball visibility."""
+        # Convert to grayscale
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         
-        # Enhance brightness and contrast
-        h, s, v = cv2.split(hsv)
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-        v = clahe.apply(v)
+        # Initialize previous frame if needed
+        if not hasattr(self, 'prev_frame'):
+            self.prev_frame = gray
+            return np.zeros_like(gray)
+            
+        # Compute absolute difference between current and previous frame
+        frame_diff = cv2.absdiff(self.prev_frame, gray)
+        self.prev_frame = gray
         
-        # Recombine and convert back to BGR
-        enhanced = cv2.merge([h, s, v])
-        enhanced = cv2.cvtColor(enhanced, cv2.COLOR_HSV2BGR)
+        # Apply threshold to get significant changes
+        _, thresh = cv2.threshold(frame_diff, 25, 255, cv2.THRESH_BINARY)
         
-        # Convert to grayscale with better contrast
-        gray = cv2.cvtColor(enhanced, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(gray, (5, 5), 0)
+        # Remove noise
+        kernel = np.ones((3, 3), np.uint8)
+        thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+        thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
         
-        return gray
+        return thresh
 
     def _detect_heuristic(self, frame_bgr: np.ndarray, t_ms: float) -> List[Detection]:
-        gray = self._preprocess(frame_bgr)
+        # Get preprocessed motion mask
+        motion_mask = self._preprocess(frame_bgr)
         dets: List[Detection] = []
-        if self.prev_gray is None:
-            self.prev_gray = gray
-            return dets
-        diff = cv2.absdiff(gray, self.prev_gray)
-        self.prev_gray = gray
-        _, th = cv2.threshold(diff, 0, 255, cv2.THRESH_OTSU)
-        th = cv2.medianBlur(th, 5)
-        th = cv2.dilate(th, np.ones((3, 3), np.uint8), iterations=1)
-        contours, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # Find contours in the motion mask
+        contours, _ = cv2.findContours(motion_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # Process each contour
+        for contour in contours:
+            # Skip small contours
+            if cv2.contourArea(contour) < 10:  # Minimum area threshold
+                continue
+                
+            # Get bounding circle
+            (x, y), radius = cv2.minEnclosingCircle(contour)
+            x, y, radius = int(x), int(y), int(radius)
+            
+            # Skip if radius is too small or too large
+            if radius < 2 or radius > 100:
+                continue
+                
+            # Calculate circularity
+            area = cv2.contourArea(contour)
+            circle_area = np.pi * (radius ** 2)
+            circularity = area / circle_area if circle_area > 0 else 0
+            
+            # Only keep reasonably circular detections with significant motion
+            if 0.3 < circularity < 1.5:  # More lenient circularity for motion
+                # Calculate confidence based on motion intensity and size
+                motion_roi = motion_mask[y-radius:y+radius, x-radius:x+radius]
+                motion_intensity = np.mean(motion_roi) / 255.0
+                confidence = min(1.0, motion_intensity * (radius / 10.0))
+                
+                if confidence > 0.2:  # Minimum confidence threshold
+                    # Create Detection with proper attributes (t_ms, x, y, r, conf)
+                    dets.append(Detection(t_ms, x, y, radius, confidence))
+        
+        # Sort by confidence (highest first)
+        dets.sort(key=lambda d: d.conf, reverse=True)
+        
+        # Keep only the top detection to avoid multiple detections
+        return dets[:1] if dets else []
         h, w = gray.shape
         for c in contours:
             if len(c) < 3:

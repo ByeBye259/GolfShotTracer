@@ -5,18 +5,18 @@ video:
   min_resolution: [1280, 720]
   max_fps: 240
 detection:
-  backend: onnx  # Force ONNX model for better accuracy
-  min_conf: 0.05  # Lower confidence threshold
-  max_candidates: 10
-  tile_long_side: 1280
-  min_radius_px: 3  # Slightly larger min radius to avoid noise
-  max_radius_px: 50  # Increased max radius for better visibility
+  backend: onnx  # Use ONNX model for better accuracy
+  min_conf: 0.01  # Very low confidence threshold to catch faint balls
+  max_candidates: 20  # Look for more candidates
+  tile_long_side: 1920  # Higher resolution for better detection
+  min_radius_px: 2  # Smaller min radius for distant balls
+  max_radius_px: 100  # Larger max radius for close-up shots
 
 tracking:
-  iou_threshold: 0.1
-  max_gap_ms: 200
-  process_noise: 5.0
-  measurement_noise: 2.0
+  iou_threshold: 0.3  # More lenient matching
+  max_gap_ms: 300     # Allow longer gaps in detection
+  process_noise: 2.0  # Lower process noise for smoother tracking
+  measurement_noise: 0.5  # Higher confidence in measurements
 
 launch:
   speed_jump_thresh: 2.0  # px/ms
