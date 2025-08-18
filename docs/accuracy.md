@@ -1,8 +1,12 @@
 # Accuracy Notes
 
-Synthetic targets (Lite baseline):
-- Carry error: ≤5% on clean synthetic clips.
-- Launch angle error: ≤2°.
-- Apex error: ≤0.5 m.
+ This Lite build outputs an overlay-only trajectory (no numeric metrics). Accuracy here refers to how closely the drawn path follows the ball across frames.
 
-Real-world targets will vary by viewpoint and motion blur. Confidence scores reflect residual fit quality and track length.
+ Tips for best alignment:
+- Prefer high contrast and stable framing (down-the-line or face-on with minimal pan).
+- Use ≥720p and ≥30 FPS; higher FPS reduces motion blur.
+- Avoid heavy stabilization/filters that warp frames.
+
+ Known limitations:
+- Single-camera, 2D overlay; depth/azimuth are not estimated.
+- Small, fast balls can exceed detector recall in extreme compression or low light.

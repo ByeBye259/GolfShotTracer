@@ -13,8 +13,6 @@ class Job:
     message: str = ""
     input_path: Optional[Path] = None
     out_video: Optional[Path] = None
-    out_json: Optional[Path] = None
-    out_csv: Optional[Path] = None
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 

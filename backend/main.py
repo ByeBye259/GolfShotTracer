@@ -1,5 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import asyncio
@@ -70,9 +70,4 @@ async def result_video(job_id: str):
     return FileResponse(job.out_video)
 
 
-@app.get("/result/{job_id}/metrics")
-async def result_metrics(job_id: str):
-    job = jobs.get(job_id)
-    if not job or not job.out_json or not job.out_json.exists():
-        raise HTTPException(404, detail="Metrics not found")
-    return FileResponse(job.out_json, media_type="application/json")
+# Metrics endpoint removed in overlay-only mode

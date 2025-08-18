@@ -27,8 +27,6 @@ def run_job(job: Job, cfg: Dict):
             progress_cb=lambda p, m: _update(job, p, m),
         )
         job.out_video = out_dir / "tracer.mp4"
-        job.out_json = out_dir / "metrics.json"
-        job.out_csv = out_dir / "metrics.csv"
         _update(job, 1.0, "done")
         job.status = "done"
     except Exception as e:

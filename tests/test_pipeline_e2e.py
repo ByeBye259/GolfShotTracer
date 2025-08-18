@@ -10,4 +10,3 @@ def test_e2e(tmp_path: Path):
     generate_synthetic_shot(str(input_video), duration_s=1.5, fps=30)
     process_video(str(input_video), str(outdir), "configs/defaults.yaml")
     assert (outdir / "tracer.mp4").exists()
-    assert (outdir / "metrics.json").exists()

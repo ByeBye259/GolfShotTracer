@@ -1,26 +1,31 @@
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 from pathlib import Path
-import json
-import csv
 import shutil
 import subprocess
 import cv2
 import numpy as np
 
-from .overlay import draw_tracer, draw_hud
+from .overlay import draw_tracer
 
 
-def write_overlay_video(input_video: str, output_video: str, points_px: List[Tuple[float, float]], metrics: Dict, codec: str = "h264", ffmpeg_path: str = "ffmpeg"):
+def write_overlay_video(input_video: str, output_video: str, points_px: List[Tuple[float, float]], codec: str = "h264", ffmpeg_path: str = "ffmpeg"):
+    # Open input video
     cap = cv2.VideoCapture(input_video)
     if not cap.isOpened():
         raise RuntimeError("Failed to open input video")
+        
+    # Get video properties
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-
+    aspect_ratio = w / h
+    
+    # Set up temporary output
     tmp_out = str(Path(output_video).with_suffix(".tmp.mp4"))
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(tmp_out, fourcc, fps, (w, h))
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')  # Use XVID for intermediate (better quality than mp4v)
+    
+    # Create writer with original dimensions to maintain aspect ratio
+    writer = cv2.VideoWriter(tmp_out, fourcc, fps, (w, h), isColor=True)
 
     idx = 0
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or len(points_px)
@@ -33,15 +38,14 @@ def write_overlay_video(input_video: str, output_video: str, points_px: List[Tup
         if idx < len(points_px):
             pts_for_frame.append(points_px[idx])
         frame = draw_tracer(frame, pts_for_frame)
-        frame = draw_hud(frame, metrics)
         writer.write(frame)
         idx += 1
     writer.release()
     cap.release()
 
-    # Try to remux audio and encode H.264 if available
+    # Try to remux audio and encode with proper settings
     out = Path(output_video)
-    if codec.lower() in ("h264", "libx264"):
+    if shutil.which(ffmpeg_path) and codec.lower() in ("h264", "libx264"):
         try:
             cmd = [
                 ffmpeg_path,
@@ -51,6 +55,11 @@ def write_overlay_video(input_video: str, output_video: str, points_px: List[Tup
                 "-map", "0:v",
                 "-map", "1:a?",
                 "-c:v", "libx264",
+                "-preset", "medium",
+                "-crf", "18",  # Lower CRF = better quality (18-28 is good)
+                "-pix_fmt", "yuv420p",
+                "-movflags", "+faststart",  # For web streaming
+                "-vf", f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2",
                 "-preset", "veryfast",
                 "-crf", "20",
                 "-c:a", "aac",
@@ -62,19 +71,3 @@ def write_overlay_video(input_video: str, output_video: str, points_px: List[Tup
             shutil.move(tmp_out, str(out))
     else:
         shutil.move(tmp_out, str(out))
-
-
-def write_metrics(output_json: str, output_csv: str, times_ms: List[float], points_px: List[Tuple[float, float]], metrics: Dict):
-    data = {
-        "times_ms": times_ms,
-        "points_px": points_px,
-        "metrics": metrics,
-    }
-    with open(output_json, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-    # CSV: t_ms, u_px, v_px, x_m, y_m if available
-    with open(output_csv, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["t_ms", "u_px", "v_px"])
-        for (t, (u, v)) in zip(times_ms, points_px):
-            writer.writerow([f"{t:.3f}", f"{u:.3f}", f"{v:.3f}"])

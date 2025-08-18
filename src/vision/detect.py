@@ -53,9 +53,28 @@ class BallDetector:
             return self._detect_onnx(frame_bgr, t_ms)
         return self._detect_heuristic(frame_bgr, t_ms)
 
-    def _detect_heuristic(self, frame_bgr: np.ndarray, t_ms: float) -> List[Detection]:
-        gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
+    def _preprocess(self, frame: np.ndarray) -> np.ndarray:
+        """Preprocess frame to enhance ball visibility."""
+        # Convert to HSV color space
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        
+        # Enhance brightness and contrast
+        h, s, v = cv2.split(hsv)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        v = clahe.apply(v)
+        
+        # Recombine and convert back to BGR
+        enhanced = cv2.merge([h, s, v])
+        enhanced = cv2.cvtColor(enhanced, cv2.COLOR_HSV2BGR)
+        
+        # Convert to grayscale with better contrast
+        gray = cv2.cvtColor(enhanced, cv2.COLOR_BGR2GRAY)
         gray = cv2.GaussianBlur(gray, (5, 5), 0)
+        
+        return gray
+
+    def _detect_heuristic(self, frame_bgr: np.ndarray, t_ms: float) -> List[Detection]:
+        gray = self._preprocess(frame_bgr)
         dets: List[Detection] = []
         if self.prev_gray is None:
             self.prev_gray = gray

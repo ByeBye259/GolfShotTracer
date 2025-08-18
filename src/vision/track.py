@@ -17,10 +17,18 @@ class TrackPoint:
 
 
 class SingleBallTracker:
-    def __init__(self, process_noise: float = 5.0, measurement_noise: float = 2.0):
+    def __init__(self, process_noise: float = 5.0, measurement_noise: float = 2.0, initial_pos: Optional[Tuple[float, float]] = None):
         self.kf = Kalman2D(process_noise=process_noise, measurement_noise=measurement_noise)
         self.last_t: Optional[float] = None
         self.track: List[TrackPoint] = []
+        
+        # Initialize with provided position if available
+        if initial_pos and initial_pos != (-1, -1):
+            x, y = initial_pos
+            # Initialize state with position and zero velocity
+            self.kf.x = np.array([[x], [y], [0], [0]])
+            # Add initial point to track
+            self.track.append(TrackPoint(0.0, x, y, 5.0, 1.0, 0.0, 0.0))
 
     def step(self, t_ms: float, detections: List[Tuple[float, float, float, float]]) -> Optional[TrackPoint]:
         dt = 0.0 if self.last_t is None else max(1e-3, (t_ms - self.last_t) / 1000.0)
