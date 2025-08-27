@@ -1,0 +1,54 @@
+# Enhanced Golf Ball Tracker Configuration
+
+# Super Resolution settings
+super_resolution:
+  model_path: "weights/EDSR_x2.pb"  # Path to pre-trained super-resolution model
+  scale: 2  # Upscaling factor (2x, 4x, etc.)
+  device: "cuda"  # "cuda" or "cpu"
+
+# Detector settings
+detector:
+  model_path: "weights/yolov8n-golf.pt"  # Path to YOLOv8 model (None for default)
+  conf_thresh: 0.25  # Confidence threshold
+  iou_thresh: 0.45  # NMS IoU threshold
+  img_size: 640  # Input image size
+
+# Tracker settings
+tracker:
+  max_age: 30  # Maximum number of frames to keep a track alive without updates
+  max_iou_distance: 0.7  # Maximum IoU distance for association
+  max_cosine_distance: 0.2  # Maximum cosine distance for feature matching
+  nms_max_overlap: 1.0  # Non-maximum suppression threshold
+  nn_budget: 100  # Maximum size of the appearance descriptors gallery
+
+# Physics-based refinement
+physics:
+  gravity: 9.81  # m/s^2 (will be scaled to pixels)
+  max_ball_speed: 100.0  # pixels/frame (used for validation)
+  min_ball_radius: 2  # pixels
+  max_ball_radius: 50  # pixels
+
+# Launch detection
+launch:
+  speed_jump_thresh: 2.0  # Pixels/frame threshold for launch detection
+  min_launch_frames: 3  # Minimum consecutive frames above threshold
+  max_initial_speed: 100.0  # Maximum allowed initial speed (pixels/frame)
+
+# Export settings
+export:
+  codec: "mp4v"  # Output video codec
+  ffmpeg_path: "ffmpeg"  # Path to ffmpeg executable
+  output_quality: 23  # Lower is better quality, 18-28 is a good range
+  show_detections: True  # Show detection bounding boxes
+  show_trajectory: True  # Show trajectory overlay
+  trajectory_color: [0, 0, 255]  # BGR color for trajectory
+  trajectory_thickness: 2  # Thickness of trajectory line
+  ball_color: [0, 255, 0]  # BGR color for ball marker
+  ball_radius: 5  # Radius of ball marker
+
+# Performance settings
+performance:
+  use_gpu: True  # Use GPU if available
+  batch_size: 8  # Batch size for detection
+  num_workers: 4  # Number of worker threads
+  half_precision: True  # Use half-precision (FP16) for inference

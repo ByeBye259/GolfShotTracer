@@ -1,0 +1,62 @@
+app:
+  name: ApexTracer-Lite
+  version: 0.1.0
+
+video:
+  min_resolution: [1280, 720]
+  max_fps: 240
+
+detector:
+  model_path: "weights/yolov8n-golf.pt"
+  conf_threshold: 0.1  # Lower confidence threshold for better detection
+  iou_threshold: 0.3   # More permissive IOU for small objects
+  img_size: 1280       # Higher resolution for better detection
+  device: ""           # Auto-detect device (CPU/GPU)
+
+detection:
+  backend: yolo        # Use YOLO for better accuracy
+  min_conf: 0.01       # Very low confidence threshold
+  max_candidates: 100  # Look for more candidates
+  min_radius_px: 1     # Smaller min radius for distant balls
+  max_radius_px: 200   # Larger max radius for close-up shots
+
+tracker:
+  max_age: 30          # frames to keep a track alive without detections
+  n_init: 3            # number of detections before track is confirmed
+  nms_max_overlap: 0.3 # non-maximum suppression threshold
+  max_iou_distance: 0.7 # maximum iou distance for association
+
+tracking:
+  iou_threshold: 0.3   # More lenient matching
+  max_gap_ms: 500      # Allow longer gaps in detection
+  process_noise: 1.0   # Lower process noise for smoother tracking
+  measurement_noise: 0.3 # Higher confidence in measurements
+
+physics:
+  gravity: 9.81        # m/s²
+  drag_coefficient: 0.24
+  air_density: 1.225   # kg/m³
+  ball_radius: 0.02135 # m (standard golf ball radius)
+  ball_mass: 0.04593   # kg (standard golf ball mass)
+
+launch:
+  speed_jump_thresh: 2.0  # px/ms
+  min_track_len: 5      # Reduced minimum track length
+
+calib:
+  fov_deg_guess: 75.0
+  principal_point: auto
+  horizon_frac_default: 0.4
+
+export:
+  codec: h264
+  ffmpeg_path: ffmpeg
+
+# Enhanced detection settings
+enhanced_detection:
+  use_adaptive_threshold: True
+  use_histogram_equalization: True
+  min_contour_area: 5
+  max_contour_area: 1000
+  min_aspect_ratio: 0.7
+  max_aspect_ratio: 1.3

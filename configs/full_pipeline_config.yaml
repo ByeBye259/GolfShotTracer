@@ -1,0 +1,53 @@
+# Full Pipeline Configuration with Roboflow
+
+# Detector Configuration (Roboflow)
+detector:
+  api_key: "qJcLmYNdUhyPeCIQC1oQ"  # Your Roboflow API key
+  model_name: "golf-ball-detection-hii2e"
+  version: 2
+  conf_thresh: 0.2  # Confidence threshold (0-1)
+
+# Tracker Configuration
+tracker:
+  max_age: 30        # Maximum frames to keep a track alive without detection
+  max_iou_distance: 0.7  # Maximum IoU distance for association
+  max_cosine_distance: 0.2  # Maximum cosine distance for feature matching
+  nms_max_overlap: 1.0  # Non-maximum suppression threshold
+
+# Physics Configuration
+physics:
+  gravity: 9.81  # m/s²
+  max_missing_frames: 5  # Max frames to keep predicting when ball is not detected
+  min_trajectory_points: 5  # Min points to consider a valid trajectory
+
+# Super Resolution (optional)
+super_resolution:
+  enabled: true
+  model_path: "weights/EDSR_x2.pb"
+  scale: 2
+
+# Output Settings
+output:
+  show_fps: true
+  show_detections: true
+  show_trajectory: true
+  trajectory_length: 30  # Number of points to show in trajectory
+  output_dir: "output"
+  video_output: "shot_tracer_output.mp4"
+  debug_frames: false  # Save debug frames
+
+# Processing
+processing:
+  frame_skip: 1  # Process every N frames (1 = no skip)
+  max_frames: 0  # Maximum frames to process (0 = all frames)
+  start_frame: 0  # Start processing from this frame
+  
+# Visualization
+visualization:
+  ball_color: [0, 255, 0]  # BGR color for ball
+  trajectory_color: [0, 0, 255]  # BGR color for trajectory
+  text_color: [255, 255, 255]  # BGR color for text
+  text_scale: 0.7
+  text_thickness: 2
+  circle_radius: 5  # Radius of ball marker
+  line_thickness: 2  # Thickness of trajectory line

@@ -1,0 +1,30 @@
+# Roboflow Detector Configuration
+detector:
+  api_key: "YOUR_ROBOFLOW_API_KEY"  # Replace with your actual API key
+  model_name: "golf-ball-detection-hii2e"
+  version: 2
+  conf_thresh: 0.2  # Adjust between 0.1-0.5 for best results
+
+# Tracker Configuration
+tracker:
+  max_age: 30
+  max_iou_distance: 0.7
+  max_cosine_distance: 0.2
+  nms_max_overlap: 1.0
+
+# Physics Configuration
+physics:
+  gravity: 9.81  # m/s²
+  max_missing_frames: 5
+
+# Super Resolution (optional)
+super_resolution:
+  model_path: "weights/EDSR_x2.pb"
+  scale: 2
+
+# Output Settings
+output:
+  show_fps: true
+  show_detections: true
+  show_trajectory: true
+  trajectory_length: 30  # Number of points to show in trajectory

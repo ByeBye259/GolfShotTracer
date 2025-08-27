@@ -4,19 +4,39 @@ app:
 video:
   min_resolution: [1280, 720]
   max_fps: 240
+detector:
+  model_path: "weights/yolov8n-golf.pt"  # Path to YOLO model
+  conf_threshold: 0.15  # Lower confidence threshold for better detection
+  iou_threshold: 0.35   # More permissive IOU for small objects
+  img_size: 640
+  device: ""  # Auto-detect device (CPU/GPU)
+
 detection:
-  backend: onnx  # Use ONNX model for better accuracy
+  backend: yolo  # Use YOLO for better accuracy
   min_conf: 0.01  # Very low confidence threshold to catch faint balls
-  max_candidates: 20  # Look for more candidates
+  max_candidates: 50  # Look for more candidates
   tile_long_side: 1920  # Higher resolution for better detection
-  min_radius_px: 2  # Smaller min radius for distant balls
-  max_radius_px: 100  # Larger max radius for close-up shots
+  min_radius_px: 1  # Smaller min radius for distant balls
+  max_radius_px: 150  # Larger max radius for close-up shots
+
+tracker:
+  max_age: 30  # frames to keep a track alive without detections
+  n_init: 3     # number of detections before track is confirmed
+  nms_max_overlap: 0.3  # non-maximum suppression threshold
+  max_iou_distance: 0.7  # maximum iou distance for association
 
 tracking:
   iou_threshold: 0.3  # More lenient matching
   max_gap_ms: 300     # Allow longer gaps in detection
   process_noise: 2.0  # Lower process noise for smoother tracking
   measurement_noise: 0.5  # Higher confidence in measurements
+
+physics:
+  gravity: 9.81  # m/s²
+  drag_coefficient: 0.24  # For a golf ball
+  air_density: 1.225  # kg/m³
+  ball_radius: 0.02135  # m (standard golf ball radius)
+  ball_mass: 0.04593  # kg (standard golf ball mass)
 
 launch:
   speed_jump_thresh: 2.0  # px/ms

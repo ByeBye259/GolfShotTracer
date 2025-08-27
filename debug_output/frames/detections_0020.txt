@@ -1,0 +1,8 @@
+Frame: 20
+Detections: 1
+
+Detection 1:
+  Center: (43.1, 618.1)
+  Radius: 25.2px
+  Confidence: 0.408
+
