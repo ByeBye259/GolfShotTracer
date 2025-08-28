@@ -1,15 +1,75 @@
-# ApexTracer-Lite: How it Works
+# GolfShotTracer: How it Works
 
-- Detection: high-recall heuristic motion/brightness detector with optional ONNX small-object model.
-- Tracking: 2D Kalman (constant velocity) to maintain a smooth, continuous ball path.
-- Launch trim: simple speed-jump heuristic to trim pre-launch frames for a clean trace.
-- Rendering: smoothed tracer polyline over the original frames; optional ffmpeg H.264 + audio remux.
-- Output: a single MP4 with the overlaid trajectory.
+## 🎯 Core Pipeline
 
-Limitations in Lite mode:
-- Single-view and 2D: overlay shows the apparent path in image space; no 3D reconstruction.
-- Heuristic detector works best on high contrast (white ball vs sky/grass) and a stable camera.
+### 1. Frame Preprocessing
+- **Color Space Conversion**: Converts frames to LAB color space for better lighting invariance
+- **Contrast Enhancement**: Applies CLAHE (Contrast Limited Adaptive Histogram Equalization)
+- **Sharpening**: Uses custom kernel for edge enhancement
+- **Background Subtraction**: MOG2 algorithm for motion detection
+- **Noise Reduction**: Advanced morphological operations for clean segmentation
 
-Upgrade path:
-- Plug-in ONNX detector (YOLOv8n/RT-DETR tiny) via `assets/models/*.onnx`.
-- If you need metrics (speed/carry/etc.), re-introduce physics and scale estimation modules and HUD overlay.
+### 2. Ball Detection
+- **Combined Detector**: Uses both YOLO and Roboflow models for robust detection
+- **Contour Analysis**: Filters candidates by size, shape, and circularity
+- **Motion Validation**: Validates detections with temporal consistency checks
+- **Color Segmentation**: Identifies white/yellow golf balls in HSV color space
+
+### 3. Tracking System
+- **Kalman Filter**: Predicts ball position between frames
+- **Hungarian Algorithm**: For data association between detections and tracks
+- **Track Management**: Handles track initiation, update, and termination
+- **Trajectory Smoothing**: Moving average filter for smooth visualization
+
+### 4. Visualization
+- **Real-time Overlay**: Shows tracking status and debug information
+- **Trajectory Drawing**: Smooth path visualization with configurable styles
+- **Performance Metrics**: Displays FPS and tracking statistics
+
+## 🏗️ Architecture
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│                 │    │                 │    │                 │
+│   Video Input   │───▶│  Preprocessing  │───▶│  Ball Detection │
+│                 │    │                 │    │                 │
+└─────────────────┘    └─────────────────┘    └────────┬────────┘
+                                                      │
+                                                      ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│                 │    │                 │    │                 │
+│  Visualization  ◀────│  Trajectory     │◀───│  Multi-Object   │
+│                 │    │  Tracking       │    │  Tracking       │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+## 🏆 Features
+
+### Advanced Detection
+- Combined YOLO + Roboflow models for high accuracy
+- Adaptive thresholding for various lighting conditions
+- Motion-based validation to reduce false positives
+
+### Professional Tracking
+- Kalman filter for smooth trajectory prediction
+- Multi-hypothesis tracking for occlusions
+- Automatic track management
+
+### Performance Optimizations
+- Efficient frame processing pipeline
+- Configurable parameters for different hardware
+- Real-time performance on consumer GPUs
+
+## 📈 Performance Considerations
+
+- **Resolution**: Works best at 720p or higher
+- **Framerate**: Higher framerates (60fps+) improve tracking accuracy
+- **Lighting**: Good lighting conditions significantly improve detection
+- **Background**: Clean, static backgrounds yield best results
+
+## 🚀 Future Improvements
+
+- 3D trajectory reconstruction
+- Ball speed and club head speed estimation
+- Swing analysis metrics
+- Mobile app integration
