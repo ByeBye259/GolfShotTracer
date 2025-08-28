@@ -1,11 +1,19 @@
 # Full Pipeline Configuration with Roboflow
 
-# Detector Configuration (Roboflow)
+# Detector Configuration
+# Choose between 'yolo' or 'roboflow'
 detector:
+  type: "roboflow"  # Options: 'yolo' or 'roboflow'
+  
+  # YOLO Detector Settings
+  model_path: "weights/yolov8n-golf.pt"
+  conf_thresh: 0.2  # Confidence threshold (0-1)
+  iou_thresh: 0.4   # IOU threshold for NMS
+  
+  # Roboflow Detector Settings
   api_key: "qJcLmYNdUhyPeCIQC1oQ"  # Your Roboflow API key
   model_name: "golf-ball-detection-hii2e"
   version: 2
-  conf_thresh: 0.2  # Confidence threshold (0-1)
 
 # Tracker Configuration
 tracker:

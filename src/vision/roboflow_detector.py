@@ -48,25 +48,41 @@ class RoboflowBallDetector:
             return []
             
         try:
+            # Save debug image
+            debug_path = Path("debug_roboflow_input.jpg")
+            cv2.imwrite(str(debug_path), image)
+            logger.info(f"Saved input image to {debug_path}")
+            
             # Convert BGR to RGB
             image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             
+            logger.info(f"Calling Roboflow model with confidence threshold: {self.conf_thresh}")
+            
             # Make prediction
-            predictions = self.model.predict(image_rgb, confidence=self.conf_thresh).json()
+            result = self.model.predict(image_rgb, confidence=self.conf_thresh)
+            predictions = result.json()
+            logger.info(f"Raw predictions: {predictions}")
             
             detections = []
-            for pred in predictions.get('predictions', []):
-                if pred['class'] == 'golf-ball' and pred['confidence'] >= self.conf_thresh:
-                    x = pred['x']
-                    y = pred['y']
-                    width = pred['width']
-                    height = pred['height']
-                    
-                    # Convert to (x, y, radius, confidence)
-                    radius = (width + height) / 4  # Average of half width and half height
-                    detections.append((x, y, radius, pred['confidence']))
+            for i, pred in enumerate(predictions.get('predictions', [])):
+                logger.info(f"Prediction {i+1}: {pred}")
+                try:
+                    if pred.get('class') == 'golf-ball' and pred.get('confidence', 0) >= self.conf_thresh:
+                        x = pred.get('x', 0)
+                        y = pred.get('y', 0)
+                        width = pred.get('width', 0)
+                        height = pred.get('height', 0)
+                        confidence = pred.get('confidence', 0)
+                        
+                        logger.info(f"Valid detection: x={x}, y={y}, width={width}, height={height}, conf={confidence}")
+                        
+                        # Convert to (x, y, radius, confidence)
+                        radius = (width + height) / 4  # Average of half width and half height
+                        detections.append((x, y, radius, confidence))
+                except Exception as e:
+                    logger.error(f"Error processing prediction {i+1}: {e}")
             
-            logger.debug(f"Detected {len(detections)} golf balls")
+            logger.info(f"Detected {len(detections)} golf balls")
             return detections
             
         except Exception as e:

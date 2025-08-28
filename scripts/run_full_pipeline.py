@@ -10,6 +10,7 @@ from tqdm import tqdm
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
+from src.vision.yolo_detector import YOLOBallDetector
 from src.vision.roboflow_detector import RoboflowBallDetector
 from src.vision.deep_sort_tracker import DeepSortTracker
 from src.physics.trajectory_refiner import TrajectoryRefiner
@@ -23,13 +24,13 @@ def load_config(config_path):
         return yaml.safe_load(f)
 
 def process_video(input_video, config):
-    """Process video with the full pipeline."""
+    """Process a video file and generate trajectory."""
     # Create output directory
     output_dir = Path(config['output']['output_dir'])
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(exist_ok=True)
     
     # Initialize video capture
-    cap = cv2.VideoCapture(input_video)
+    cap = cv2.VideoCapture(str(input_video))
     if not cap.isOpened():
         logger.error(f"Could not open video: {input_video}")
         return
@@ -40,13 +41,24 @@ def process_video(input_video, config):
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     
-    # Initialize components
-    detector = RoboflowBallDetector(
-        api_key=config['detector']['api_key'],
-        model_name=config['detector']['model_name'],
-        version=config['detector']['version'],
-        conf_thresh=config['detector']['conf_thresh']
-    )
+    # Initialize detector based on config
+    detector_type = config['detector'].get('type', 'yolo').lower()
+    
+    if detector_type == 'roboflow':
+        detector = RoboflowBallDetector(
+            api_key=config['detector'].get('api_key', ''),
+            model_name=config['detector'].get('model_name', 'golf-ball-detection-hii2e'),
+            version=config['detector'].get('version', 2),
+            conf_thresh=config['detector'].get('conf_thresh', 0.2)
+        )
+        logger.info("Using Roboflow detector")
+    else:  # Default to YOLO
+        detector = YOLOBallDetector(
+            model_path=config['detector'].get('model_path', 'weights/yolov8n-golf.pt'),
+            conf_thresh=config['detector'].get('conf_thresh', 0.2),
+            iou_thresh=config['detector'].get('iou_thresh', 0.4)
+        )
+        logger.info("Using YOLO detector")
     
     tracker = DeepSortTracker(
         max_age=config['tracker']['max_age'],
@@ -55,9 +67,13 @@ def process_video(input_video, config):
         nms_max_overlap=config['tracker']['nms_max_overlap']
     )
     
+    # Initialize trajectory refiner with physics parameters
     trajectory_refiner = TrajectoryRefiner(
         g=config['physics']['gravity'] * (frame_height / 100),  # Scale gravity to pixels
-        dt=1.0/fps
+        dt=1.0/fps,
+        max_missing_frames=config['physics'].get('max_missing_frames', 3),
+        min_velocity=config['physics'].get('min_velocity', 1.0),
+        max_acceleration=config['physics'].get('max_acceleration', 100.0)
     )
     
     # Initialize video writer
@@ -87,45 +103,68 @@ def process_video(input_video, config):
                 # Process frame
                 vis_frame = frame.copy()
                 
+                # Debug: Save a frame for inspection
+                if frame_count == 0:
+                    debug_frame_path = output_dir / 'debug_first_frame.jpg'
+                    cv2.imwrite(str(debug_frame_path), frame)
+                    print(f"Debug: Saved first frame to {debug_frame_path}")
+                
                 # Detect balls
+                print(f"\nProcessing frame {frame_count}")
                 detections = detector.detect(frame)
+                print(f"Found {len(detections)} detections")
                 
                 # Convert detections to tracker format [x1, y1, x2, y2, conf]
                 bboxes = []
                 confidences = []
-                for (x, y, r, conf) in detections:
+                for i, (x, y, r, conf) in enumerate(detections):
                     x1, y1 = int(x - r), int(y - r)
                     x2, y2 = int(x + r), int(y + r)
                     bboxes.append([x1, y1, x2, y2])
                     confidences.append(conf)
+                    print(f"  Detection {i+1}: center=({x:.1f}, {y:.1f}), radius={r:.1f}, conf={conf:.2f}")
                 
-                # Update tracker
-                if bboxes:
+                # Update trajectory
+                if bboxes and len(bboxes) > 0:
                     bboxes = np.array(bboxes)
                     confidences = np.array(confidences)
                     tracked_objects = tracker.update(bboxes, confidences, frame)
                     
-                    # Update trajectory
+                    # Update trajectory with detections
                     for obj in tracked_objects:
-                        x1, y1, x2, y2 = obj.bbox
-                        cx = (x1 + x2) / 2
-                        cy = (y1 + y2) / 2
-                        trajectory_refiner.add_point(cx, cy, frame_count/fps, obj.confidence)
-                        
-                        # Draw current detection
-                        if config['output']['show_detections']:
-                            cv2.rectangle(vis_frame, (x1, y1), (x2, y2), 
-                                        config['visualization']['ball_color'], 2)
+                        if hasattr(obj, 'bbox') and len(obj.bbox) >= 4:
+                            x1, y1, x2, y2 = obj.bbox[:4]  # Ensure we have at least 4 values
+                            cx = (x1 + x2) / 2
+                            cy = (y1 + y2) / 2
+                            confidence = getattr(obj, 'confidence', 1.0)
+                            
+                            # Add point to trajectory refiner
+                            trajectory_refiner.add_point(cx, cy, frame_count/fps, confidence)
+                            
+                            # Draw current detection
+                            if config['output']['show_detections']:
+                                cv2.rectangle(vis_frame, (int(x1), int(y1)), (int(x2), int(y2)), 
+                                            config['visualization']['ball_color'], 2)
                 
                 # Get and draw trajectory
-                if config['output']['show_trajectory'] and len(trajectory_refiner.points) > 1:
-                    points = trajectory_refiner.get_trajectory()
-                    for i in range(1, len(points)):
-                        pt1 = (int(points[i-1][0]), int(points[i-1][1]))
-                        pt2 = (int(points[i][0]), int(points[i][1]))
-                        cv2.line(vis_frame, pt1, pt2, 
-                                config['visualization']['trajectory_color'], 
-                                config['visualization']['line_thickness'])
+                if config['output']['show_trajectory'] and hasattr(trajectory_refiner, 'trajectory'):
+                    # Get the current trajectory points
+                    trajectory = trajectory_refiner.trajectory
+                    
+                    if trajectory and len(trajectory) > 1:
+                        # Convert trajectory points to pixel coordinates
+                        points = []
+                        for point in trajectory:
+                            if hasattr(point, 'x') and hasattr(point, 'y'):
+                                points.append((int(point.x), int(point.y)))
+                        
+                        # Draw the trajectory
+                        if len(points) > 1:
+                            for i in range(1, len(points)):
+                                if points[i-1] is not None and points[i] is not None:
+                                    cv2.line(vis_frame, points[i-1], points[i],
+                                            config['visualization']['trajectory_color'],
+                                            config['visualization']['line_thickness'])
                 
                 # Add FPS counter
                 if config['output']['show_fps']:

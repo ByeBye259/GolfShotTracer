@@ -1,0 +1,21 @@
+# Detection Configuration
+
+# YOLO Detector Configuration
+yolo:
+  enabled: true
+  model_path: "weights/yolov8n-golf.pt"
+  conf_thresh: 0.2  # Confidence threshold (0-1)
+  iou_thresh: 0.4   # IOU threshold for NMS
+
+# Roboflow Detector Configuration
+roboflow:
+  enabled: true
+  api_key: "qJcLmYNdUhyPeCIQC1oQ"  # Your Roboflow API key
+  model_name: "golf-ball-detection-hii2e"
+  version: 2
+  conf_thresh: 0.2  # Confidence threshold (0-1)
+
+# Detection Filtering
+min_ball_radius: 2    # Minimum ball radius in pixels
+max_ball_radius: 200  # Maximum ball radius in pixels
+nms_iou_threshold: 0.5  # IOU threshold for Non-Maximum Suppression
