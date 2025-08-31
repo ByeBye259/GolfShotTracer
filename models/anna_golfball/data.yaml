@@ -1,0 +1,12 @@
+names:
+- golfball
+nc: 1
+roboflow:
+  license: CC BY 4.0
+  project: golfball
+  url: https://universe.roboflow.com/anna-gaming/golfball/dataset/1
+  version: 1
+  workspace: anna-gaming
+test: ../test/images
+train: ../train/images
+val: ../valid/images
